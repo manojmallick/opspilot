@@ -1,56 +1,217 @@
-# OpsPilot — Track 4: Autopilot Agent
+# OpsPilot 🇳🇱
 
-Dutch SME operations autopilot, built by the co-owner of Topclass Nederland VOF and tested against that business's real invoices. Handles invoice processing, customer inquiries, quarterly BTW declarations, and weekly growth intelligence — end-to-end, with a **Human Ledger** keeping humans in the loop for every decision that matters.
+**Full business-operations autopilot for Dutch SMEs — powered by Qwen Cloud.**
 
-## The Human Ledger (governance, named and inspectable)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](tsconfig.json)
+[![Qwen](https://img.shields.io/badge/Qwen-vl--max%20%7C%20max-orange.svg)](https://www.alibabacloud.com/en/solutions/generative-ai/qwen)
+[![Track](https://img.shields.io/badge/Qwen%20Hackathon-Track%204%3A%20Autopilot%20Agent-purple.svg)](#)
 
-Every action OpsPilot takes on real business data is appended to `opspilot_ledger.jsonl` with its confidence, status, and reason. The rules:
+OpsPilot automates the four operational workflows every small Dutch business runs on repeat — invoice processing, customer inquiries, quarterly BTW (VAT) declarations, and weekly growth review — **end-to-end**, while a named, inspectable governance layer (the **Human Ledger**) guarantees that every decision that matters is held for a human.
 
-- Any invoice extraction where Qwen-VL's **lowest field confidence is below 0.90** is **held for review** — never auto-filed into BTW calculations.
-- BTW declarations are **always** held for human sign-off before filing.
-- Auto-approval additionally requires: amount ≤ €500 **and** vendor on the approved list.
+Built by the co-owner of **Topclass Nederland VOF** (a Dutch driving school), designed to run against that business's real invoices — not synthetic demo data.
 
-Inspect the queue anytime: the ledger's `reviewQueue()` returns everything awaiting a human.
+---
 
-## Run
+## Table of Contents
 
-```bash
-cp .env.example .env      # add your Qwen Cloud API key
-npm install
-npm run dev               # demo: BTW declaration + growth intelligence on sample data
+- [Why OpsPilot](#why-opspilot)
+- [Architecture](#architecture)
+- [The Human Ledger](#the-human-ledger)
+- [The Four Workflows](#the-four-workflows)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Benchmark: Measured, Not Claimed](#benchmark-measured-not-claimed)
+- [Tool Coverage (Auto-Counted)](#tool-coverage-auto-counted)
+- [Qwen-Specific Capabilities](#qwen-specific-capabilities)
+- [Project Structure](#project-structure)
+- [Privacy & Data Handling](#privacy--data-handling)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+---
+
+## Why OpsPilot
+
+Running a small Dutch business means handling, every single week:
+
+| Task | Pain | Risk of getting it wrong |
+|---|---|---|
+| Vendor invoices | Manual data entry from PDFs and photos | Wrong BTW deductions |
+| Customer inquiries | Dutch + English, quotes, follow-ups | Lost revenue |
+| BTW declaration | Quarterly, Belastingdienst format, 7-year archive duty | Tax penalties |
+| Growth review | Overdue invoices, stale quotes, SEO | Slow decline nobody notices |
+
+Each task is repetitive, important, and easy to get wrong. OpsPilot automates all four — but **never silently**. Every automated action is logged, confidence-scored, and gated.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Inputs
+        A[📄 Invoice image<br/>photo / scan]
+        B[✉️ Customer message<br/>Dutch or English]
+        C[⏰ Quarterly timer]
+        D[📅 Weekly timer]
+    end
+
+    subgraph OpsPilot Core
+        direction TB
+        V["Qwen-VL-Max<br/>vision extraction<br/>+ per-field confidence"]
+        Q["Qwen-Max<br/>classification · quoting · digests"]
+        HL{{"🛡️ Human Ledger<br/>confidence ≥ 0.90?"}}
+        BK[("BookkeepingStore<br/>invoices · transactions<br/>CRM · declarations")]
+    end
+
+    subgraph Outputs
+        E[✅ Auto-applied<br/>logged with reason]
+        F[🙋 Review queue<br/>held for human]
+        G[📊 BTW declaration<br/>always human sign-off]
+        H[📈 Weekly digest<br/>reminders · follow-ups · SEO]
+    end
+
+    A --> V --> HL
+    B --> Q --> BK
+    C --> BK --> G
+    D --> BK --> H
+    HL -- "high confidence<br/>+ ≤ €500 + approved vendor" --> E
+    HL -- "low confidence<br/>or above threshold" --> F
+    E --> BK
+    F --> BK
 ```
 
-## Benchmark against real invoices (measured, not claimed)
+Every Qwen call — model, kind, token counts, JSON validity — is appended to a persistent usage log, so the [tool-coverage report](#tool-coverage-auto-counted) is generated from real counts, never typed by hand.
 
-1. Put invoice images (jpg/png/webp) in `data/invoices/` — photograph or export PDFs as images.
-2. Fill `data/ground_truth.json` with manually verified field values per file (template in `src/benchmark.ts`).
-3. `npm run benchmark` → prints real field-level accuracy and writes `benchmark_results.json`.
+## The Human Ledger
 
-Report whatever the actual numbers are, including misses — e.g. "23/24 fields correct across 4 real invoices (95.8%), one BTW number misread on a low-resolution photo."
+The governance layer, named and inspectable. Every action OpsPilot takes on business data is appended to `opspilot_ledger.jsonl`:
 
-## Tool coverage (auto-counted)
+```json
+{
+  "timestamp": "2026-07-20T10:14:03.512Z",
+  "action": "invoice_extraction",
+  "confidence": 0.72,
+  "status": "held_for_review",
+  "reason": "low confidence on btwNumber (0.72)",
+  "dataSummary": { "vendor": "…", "invoiceNumber": "…", "totalInclBtw": 847.0 }
+}
+```
 
-`npm run coverage` generates `TOOL_COVERAGE.md` from the persisted usage log (`opspilot_usage.jsonl`) and the Human Ledger — Qwen-VL calls, per-model call counts, JSON-validity rate, token totals, auto-applied vs held-for-review decisions. No hand-typed numbers.
+**The rules are hard-coded, not prompt-suggested:**
 
-## Workflows
+1. Qwen-VL reports a confidence score **per extracted field**. The invoice's overall confidence is the **minimum** across fields — one glare-obscured BTW number is enough to hold the whole invoice.
+2. Anything below **0.90** is held for review. It is never auto-filed into BTW calculations.
+3. Auto-approval additionally requires amount **≤ €500** *and* the vendor on the approved list.
+4. **BTW declarations are always held** for human sign-off before filing. No exceptions.
 
-1. **Invoice Autopilot** — Qwen-VL extracts fields with per-field confidence; Human Ledger gates auto-approval; classification via qwen-max.
-2. **Customer Inquiry** — classifies Dutch/English messages, drafts quotes, logs to CRM with follow-up dates.
-3. **BTW Declaration** — aggregates quarterly transactions, computes Dutch VAT owed, always held for human sign-off.
-4. **Growth Intelligence** — weekly digest, overdue reminders, SEO blog outline, pipeline follow-ups.
+Inspect the queue any time via `ledger.reviewQueue()`, or aggregate stats via `ledger.stats()`.
 
-## Qwen-specific capabilities used
+## The Four Workflows
 
-- **qwen-vl-max** — reads Dutch invoice images natively (photos and scans)
-- **qwen-max** — classification, quoting, digests
-- **Structured output** — every JSON response fence-stripped and validated; validity rate tracked in the coverage report
-- **Multilingual** — Dutch Belastingdienst terminology handled natively, not translated
+### 1 · Invoice Autopilot
+`Qwen-VL-Max` reads the invoice image (photo or scan, Dutch or English) and extracts vendor, BTW number, invoice number, dates, line items, and totals — each with its own confidence score. Dutch `DD-MM-YYYY` dates are normalised to ISO. `Qwen-Max` then classifies the expense category. The Human Ledger decides: auto-apply, or hold.
 
-## Files
+### 2 · Customer Inquiry Autopilot
+Classifies incoming messages (`sales_inquiry` / `support` / `complaint` / `spam`), detects language, extracts requirements, drafts a personalised quote against your service catalogue and pricing rules, and logs everything to the CRM with a scheduled follow-up date. Non-standard quotes are flagged `CUSTOM` for human review.
 
-- `src/qwenClient.ts` — Qwen Cloud client: vision, JSON validation, persistent usage tracking
-- `src/humanLedger.ts` — the Human Ledger (confidence-gated human-in-the-loop)
-- `src/index.ts` — all four workflows + demo
-- `src/benchmark.ts` — real-invoice accuracy benchmark
-- `src/coverage.ts` — auto-counted Qwen tool-coverage checklist
-- `CHALLENGES.md` — real challenges diary (fill during benchmark runs)
+### 3 · BTW Declaration Autopilot
+Aggregates the quarter's revenue and deductible expenses from the bookkeeping store, computes BTW owed (21% on revenue minus BTW paid on expenses), and produces a declaration — **always** `pending_human_review`, always ledgered.
+
+### 4 · Growth Intelligence
+Weekly: revenue trend vs the previous period, payment reminders for stuck invoices, follow-up drafts for quotes silent ≥ 7 days, an SEO blog outline for your top opportunity keyword, and a two-paragraph founder digest — with an escalation flag when monthly revenue tracks below 80% of target.
+
+## Quick Start
+
+**Prerequisites:** Node.js 18+, a [Qwen Cloud API key](https://www.alibabacloud.com/en/product/modelstudio).
+
+```bash
+git clone https://github.com/manojmallick/opspilot.git
+cd opspilot
+npm install
+
+cp .env.example .env        # then add your QWEN_API_KEY
+
+npm run dev                 # demo: BTW declaration + growth intelligence on sample data
+```
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `QWEN_API_KEY` | — (required) | Qwen Cloud API key |
+| `QWEN_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | OpenAI-compatible endpoint (use `dashscope-intl` outside mainland China) |
+| `OPSPILOT_USAGE_LOG` | `opspilot_usage.jsonl` | Where Qwen call usage is appended |
+
+Key operational constants (in code, deliberately explicit):
+
+| Constant | Value | Where |
+|---|---|---|
+| Confidence auto-apply threshold | `0.90` | `src/humanLedger.ts` |
+| Auto-approve amount ceiling | `€500` | `src/index.ts` |
+| BTW rate | `21%` | `src/index.ts` |
+
+## Benchmark: Measured, Not Claimed
+
+OpsPilot ships a benchmark harness so extraction accuracy is a **measured number from real invoices**, not a marketing claim.
+
+```bash
+# 1. Put real invoice images (jpg/png/webp) in data/invoices/
+# 2. Fill data/ground_truth.json with manually verified field values
+#    (template documented at the top of src/benchmark.ts)
+npm run benchmark
+```
+
+Output: field-level accuracy, per-invoice mismatches (expected vs got), how many invoices the Human Ledger held for review — printed and written to `benchmark_results.json`.
+
+> **Honesty policy:** results are reported as-is, including misses. "23/24 fields correct across 4 real invoices, one BTW number misread on a low-resolution photo" beats an unmeasured "reads invoices accurately". Real issues found during benchmark runs are recorded in [CHALLENGES.md](CHALLENGES.md).
+
+## Tool Coverage (Auto-Counted)
+
+```bash
+npm run coverage            # generates TOOL_COVERAGE.md
+```
+
+Every number comes from the persisted usage log and the Human Ledger: Qwen-VL call count, per-model call counts, structured-output JSON validity rate, token totals, and auto-applied vs held-for-review decisions. Zero hand-typed statistics.
+
+## Qwen-Specific Capabilities
+
+| Capability | Where it's used | Why it matters |
+|---|---|---|
+| **qwen-vl-max** vision | Invoice field extraction | Reads Dutch invoices from *photos*, not just clean PDFs |
+| **qwen-max** reasoning | Classification, quotes, digests | Professional-quality Dutch + English output |
+| Structured output | Every JSON response | Fence-stripped, validated, validity-rate tracked |
+| Multilingual (NL/EN) | All workflows | Belastingdienst terminology handled natively, not translated |
+
+## Project Structure
+
+```
+opspilot/
+├── src/
+│   ├── index.ts          # OpsPilot class — all four workflows + demo
+│   ├── qwenClient.ts     # Qwen Cloud client: vision, JSON validation, usage tracking
+│   ├── humanLedger.ts    # Human Ledger — confidence-gated human-in-the-loop
+│   ├── benchmark.ts      # real-invoice accuracy benchmark
+│   └── coverage.ts       # auto-counted Qwen tool-coverage report
+├── data/
+│   ├── invoices/         # your real invoice images (git-ignored)
+│   └── ground_truth.json # manually verified fields  (git-ignored)
+├── CHALLENGES.md         # real issues diary — filled during live runs
+└── README.md
+```
+
+## Privacy & Data Handling
+
+- Real invoice images, ground truth, the bookkeeping store, ledger, and usage logs are **all git-ignored** — no business data ever leaves the machine except to the Qwen API for processing.
+- `.env` (API keys) is git-ignored; only `.env.example` is committed.
+- Dutch invoices contain BTW numbers and business addresses — treat `data/` as confidential.
+
+## Roadmap
+
+- [ ] Email inbox trigger (invoice attachments → workflow 1 automatically)
+- [ ] Belastingdienst submission-file export for the BTW declaration
+- [ ] Google Search Console integration for live SEO data in workflow 4
+- [ ] Web review-queue UI on top of the Human Ledger
+
+## License
+
+[MIT](LICENSE) © 2026 Manoj Mallick · Built for the Qwen Cloud Hackathon, Track 4 (Autopilot Agent).

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.jsonl
+data/invoices/*
+data/ground_truth.json
+opspilot_store.json
+benchmark_results.json
+!data/invoices/.gitkeep

@@ -1,0 +1,22 @@
+{
+  "name": "opspilot",
+  "version": "0.1.0",
+  "description": "Track 4 - OpsPilot: Dutch SME operations autopilot",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "benchmark": "ts-node src/benchmark.ts",
+    "coverage": "ts-node src/coverage.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "openai": "^4.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

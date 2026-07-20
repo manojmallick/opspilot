@@ -9,8 +9,6 @@
 
 OpsPilot automates the four operational workflows every small Dutch business runs on repeat — invoice processing, customer inquiries, quarterly BTW (VAT) declarations, and weekly growth review — **end-to-end**, while a named, inspectable governance layer (the **Human Ledger**) guarantees that every decision that matters is held for a human.
 
-Built by the co-owner of **Topclass Nederland VOF** (a Dutch driving school), designed to run against that business's real invoices — not synthetic demo data.
-
 ---
 
 ## Table of Contents

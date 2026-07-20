@@ -1,7 +1,7 @@
 # Real Challenges Diary
 
 > Fill this in DURING the build, with issues that actually happened while
-> running the benchmark against real Topclass Nederland invoices. Do not
+> running the benchmark against real Dutch invoices. Do not
 > invent entries — an empty diary is better than a fabricated one.
 > Dutch invoices are a genuinely good source of real edge cases: different
 > layouts per vendor, handwritten amounts, glare on photographed paper,

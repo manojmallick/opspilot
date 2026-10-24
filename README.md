@@ -180,6 +180,16 @@ Every number comes from the persisted usage log and the Human Ledger: Qwen-VL ca
 | Structured output | Every JSON response | Fence-stripped, validated, validity-rate tracked |
 | Multilingual (NL/EN) | All workflows | Belastingdienst terminology handled natively, not translated |
 
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Run `src/index.ts` with ts-node |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm start` | Run the compiled build (`node dist/index.js`) |
+| `npm run benchmark` | Run the measured benchmark (`src/benchmark.ts`) |
+| `npm run coverage` | Count tool coverage (`src/coverage.ts`) |
+
 ## Project Structure
 
 ```
